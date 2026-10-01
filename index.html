@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ParcelSense | Smart Package Monitoring</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar"><div><span class="logo">PS</span><span class="brand">ParcelSense</span></div><span class="muted">Smart Package Monitoring</span></header>
+<main class="container">
+  <section class="heading"><div><p class="eyebrow">SHIPMENT OPERATIONS</p><h1>Package dashboard</h1><p class="muted">Track deliveries and check simulated package conditions.</p></div>
+  <button id="refreshBtn">Refresh sensor data</button></section>
+  <section class="stats">
+    <article class="stat"><span>Total packages</span><strong id="total">—</strong></article>
+    <article class="stat"><span>In transit</span><strong id="in_transit">—</strong></article>
+    <article class="stat"><span>Delivered</span><strong id="delivered">—</strong></article>
+    <article class="stat"><span>Packages with alerts</span><strong id="alerts">—</strong></article>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>Package conditions</h2><p class="muted">Temperature, humidity, shock, and delivery status</p></div>
+      <input id="search" placeholder="Search tracking ID, recipient, destination…">
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Tracking ID</th><th>Recipient / Destination</th><th>Temperature</th><th>Humidity</th><th>Shock</th><th>Status</th><th>Condition</th></tr></thead><tbody id="packageRows"><tr><td colspan="7">Loading…</td></tr></tbody></table></div>
+    <p id="message" class="muted small"></p>
+  </section>
+  <p class="footnote">Demo readings are simulated. Sensor thresholds are examples and should be configured for the actual goods being shipped.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const statuses = ['Picked Up','In Transit','Delivered','Exception'];
+function badge(status) { return `<span class="badge ${status === 'Delivered' ? 'good' : status === 'Exception' ? 'bad' : 'info'}">${status}</span>`; }
+async function load() {
+  const [packagesRes, summaryRes] = await Promise.all([
+    fetch('/api/packages?q=' + encodeURIComponent($('search').value)), fetch('/api/summary')
+  ]);
+  const packages = await packagesRes.json(), summary = await summaryRes.json();
+  ['total','in_transit','delivered','alerts'].forEach(k => $(k).textContent = summary[k]);
+  $('packageRows').innerHTML = packages.length ? packages.map(p => {
+    const condition = p.alerts.length ? `<span class="badge bad">${p.alerts.length} alert(s)</span><div class="small alert-text">${p.alerts.join(', ')}</div>` : '<span class="badge good">Normal</span>';
+    return `<tr><td><strong>${p.tracking_id}</strong><div class="muted small">${p.updated_at.replace('T',' ')}</div></td>
+      <td>${p.recipient}<div class="muted small">${p.destination}</div></td>
+      <td>${p.temperature} °C</td><td>${p.humidity}%</td><td>${p.shock} g</td>
+      <td><select class="status-select" data-id="${p.tracking_id}">${statuses.map(s => `<option ${s===p.status?'selected':''}>${s}</option>`).join('')}</select></td><td>${condition}</td></tr>`;
+  }).join('') : '<tr><td colspan="7">No packages match your search.</td></tr>';
+  document.querySelectorAll('.status-select').forEach(sel => sel.addEventListener('change', async e => {
+    const res = await fetch('/api/packages/' + encodeURIComponent(e.target.dataset.id) + '/status', {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:e.target.value})
+    });
+    $('message').textContent = res.ok ? 'Package status updated.' : 'Could not update status.';
+    await load();
+  }));
+}
+$('refreshBtn').addEventListener('click', async () => { $('message').textContent = 'Updating simulated sensor readings…'; await fetch('/api/simulate', {method:'POST'}); await load(); $('message').textContent = 'Sensor data updated.'; });
+$('search').addEventListener('input', load);
+load(); setInterval(load, 15000);
+</script>
+</body></html>
