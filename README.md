@@ -14,10 +14,6 @@ This project demonstrates a monitoring dashboard for package status and sensor r
 
 ## System Architecture
 
-![System architecture for IoT-based package tracking](screenshots/system-architecture.png)
-
-**Figure 1: Reference architecture for an IoT-based package tracking system.**
-
 The diagram illustrates a possible end-to-end IoT architecture:
 
 1. **Sensors and tracking modules:** GPS/GSM modules can provide location and communication; RFID readers can identify tagged packages; and a Raspberry Pi can act as an edge device or gateway.
